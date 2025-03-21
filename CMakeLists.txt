@@ -11,7 +11,7 @@ if (NOT TARGET ${TARGET_NAME})
     )
 
     target_link_libraries(${TARGET_NAME} INTERFACE
-        pico_stdlib pico_flash hardware_exception
+        pico_stdlib pico_flash hardware_flash hardware_exception
     )
 endif()
 
