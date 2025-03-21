@@ -86,16 +86,18 @@ void Logger::read_memory() {
 void Logger::write_memory(const uint8_t* packet, bool flush) {
     uint32_t packet_bytes_read = 0;
 
-    while(packet_bytes_read < packet_len) {
-        if (buffer_len == FLASH_PAGE_SIZE) {
-            flush_buffer();
+    if (packet != NULL) {
+        while(packet_bytes_read < packet_len) {
+            if (buffer_len == FLASH_PAGE_SIZE) {
+                flush_buffer();
+            }
+            buffer[buffer_len] = packet[packet_bytes_read];
+            buffer_len++;
+            packet_bytes_read++;
         }
-        buffer[buffer_len] = packet[packet_bytes_read];
-        buffer_len++;
-        packet_bytes_read++;
-    }
 
-    if (flush) { flush_buffer(); }
+        if (flush) { flush_buffer(); }
+    }
 }
 
 void Logger::flush_buffer() {
@@ -122,3 +124,56 @@ void Logger::erase_memory() {
     log_curr_addr = log_base_addr;
 }
 
+
+void Logger::initialize_circular_buffer(size_t len) {
+    if (circular_buffer == NULL) {
+        circular_buffer_len = len;
+        circular_buffer = (uint8_t*) malloc(circular_buffer_len);
+    }
+}
+
+void Logger::write_circular_buffer(const uint8_t* packet) {
+    if (packet != NULL) {
+        for (uint32_t idx = 0; idx < packet_len; idx++) {
+            circular_buffer[idx + circular_buffer_offset] = packet[idx];
+        }
+        circular_buffer_offset += packet_len;
+        circular_buffer_offset %= circular_buffer_len;
+    }
+}
+
+void Logger::read_circular_buffer() {
+    uint32_t idx = ((circular_buffer_offset + packet_len) % circular_buffer_len);
+    if (print_func != nullptr) {
+        do {
+            print_func(circular_buffer + idx);
+            idx += packet_len;
+            idx %= circular_buffer_len;
+        } while (idx != circular_buffer_offset);
+    } else {
+        printf("PICO_LOGGER: Reading memory back in byte format!\n");
+        do {
+            printf("%02x", *(circular_buffer + idx));
+            if (idx % 16 == 15)
+                printf("\n");
+            else
+                printf(" ");
+            idx += packet_len;
+            idx %= circular_buffer_len;
+        } while ( idx != circular_buffer_offset );
+    }
+}
+
+void Logger::flush_circular_buffer(bool free_buffer) {
+    uint32_t idx = ((circular_buffer_offset + packet_len) % circular_buffer_len);
+    do {
+        write_memory(circular_buffer + idx, false);
+        idx += packet_len;
+        idx %= circular_buffer_len;
+    } while (idx != circular_buffer_offset);
+    flush_buffer();
+    if (free_buffer) {
+        free(circular_buffer);
+        circular_buffer = NULL;
+    }
+}

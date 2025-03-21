@@ -44,13 +44,84 @@ void core1_entry() {
     logger.read_memory();
     logger.initialize(false);
 
-    printf("Writing memory!\n");
+    logger.initialize_circular_buffer(25600);
+
+    sleep_ms(100);
+
+    printf("Writing circular buffer!\n");
 
     uint8_t entry[PACKET_LEN];
 
     printf("Written Data:\n");
     printf("time (us)\t|\tstate\t|\tdep pcnt\t|\talt (m)\t|\tvel (m/s)\t|\tempty\n");
-    for (uint16_t i = 0; i < 500; i++) {
+    for (uint16_t i = 0; i < 1000; i++) {
+        absolute_time_t now = get_absolute_time();
+        uint64_t now_us= to_us_since_boot(now);
+        float altitude = 10.0f * i;
+        float velocity = 5.0f * i;
+        uint8_t deploy_percent = (i*100) / 200;
+        printf("%" PRIu64 "\t|\t%" PRIu8 "\t|\t%" PRIu8 "\t|\t%4.2f\t|\t%4.2f\t|\tDAWSYN_SCHRAIB\n", now_us, (uint8_t)(i), deploy_percent, altitude, velocity);
+        uint32_t alt_bits = *((uint32_t *)&altitude);
+        uint32_t vel_bits = *((uint32_t *)&velocity);
+        entry[0] = now_us >> 56;
+        entry[1] = now_us >> 48;
+        entry[2] = now_us >> 40;
+        entry[3] = now_us >> 32;
+        entry[4] = now_us >> 24;
+        entry[5] = now_us >> 16;
+        entry[6] = now_us >> 8;
+        entry[7] = now_us;
+        entry[8] = i;
+        entry[9] = deploy_percent;
+        entry[10] = alt_bits >> 24;
+        entry[11] = alt_bits >> 16;
+        entry[12] = alt_bits >> 8;
+        entry[13] = alt_bits;
+        entry[14] = vel_bits >> 24;
+        entry[15] = vel_bits >> 16;
+        entry[16] = vel_bits >> 8;
+        entry[17] = vel_bits;
+        entry[18] = 'D';
+        entry[19] = 'A';
+        entry[20] = 'W';
+        entry[21] = 'S';
+        entry[22] = 'Y';
+        entry[23] = 'N';
+        entry[24] = '_';
+        entry[25] = 'S';
+        entry[26] = 'C';
+        entry[27] = 'H';
+        entry[28] = 'R';
+        entry[29] = 'A';
+        entry[30] = 'I';
+        entry[31] = 'B';
+        logger.write_circular_buffer(entry);
+    }
+ 
+    printf("Reading circular buffer!\n");
+    logger.read_circular_buffer();
+
+    sleep_ms(500);
+
+    printf("Flushing circular buffer!\n");
+    logger.flush_circular_buffer(true);
+
+    printf("Reading memory!\n");
+    logger.read_memory();
+
+    printf("Erasing memory!\n");
+    logger.erase_memory();
+
+    printf("Reading memory!\n");
+    logger.read_memory();
+
+    sleep_ms(500);
+
+    printf("Writing memory!\n");
+
+    printf("Written Data:\n");
+    printf("time (us)\t|\tstate\t|\tdep pcnt\t|\talt (m)\t|\tvel (m/s)\t|\tempty\n");
+    for (uint16_t i = 0; i < 1000; i++) {
         absolute_time_t now = get_absolute_time();
         uint64_t now_us= to_us_since_boot(now);
         float altitude = 10.0f * i;
@@ -94,7 +165,7 @@ void core1_entry() {
         logger.write_memory(entry, false);
     }
     logger.flush_buffer();
- 
+
     printf("Reading memory!\n");
     logger.read_memory();
 }

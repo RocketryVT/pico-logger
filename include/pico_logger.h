@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "pico/stdlib.h"
@@ -89,6 +90,55 @@ class Logger {
          * buffer_len, and reset buffer_len to 0.
          */
         void flush_buffer();
+
+        /* initialize_circular_buffer
+         *
+         * Allocate memory for circular logging buffer given a size_t len.
+         *
+         * @param len: number of bytes for circular logging buffer to be
+         *             allocated
+         */
+        void initialize_circular_buffer(size_t len);
+
+
+        /* write_circular_buffer
+         *
+         * Copies data found in packet to the circular logging buffer until
+         * bytes copied is equal to the user defined packet length. When the
+         * buffer is found to be full
+         * (i.e. circular_buffer_offset == circular_buffer_len),
+         * write_circular_buffer will overwrite the oldest data in the buffer.
+         * This circumstance is often used as a way to anticipate an event and
+         * log the time just before an event occurs (e.g. a rocket launch).
+         *
+         * @param packet: ptr to buffer containing packet data to write to
+         *                memory
+         * @param flush: True to force buffer flush regardless of current
+         *               capacity
+         */
+        void write_circular_buffer(const uint8_t* packet);
+
+        /* read_circular_buffer
+         *
+         * Calls print_func (user provided packet print function) if defined on
+         * every non-empty flash address at packet_len intervals. Otherwise,
+         * read_circular_buffer prints all data found in byte format.
+         */
+        void read_circular_buffer();
+
+        /* flush_circular_buffer
+         *
+         * Commit contents of circular buffer to flash by calling write_memory
+         * for every stored packet and eventually flush_buffer to ensure
+         * everything is fully committed to flash.
+         *
+         * @param free_buffer: whether or not to free the memory allocated to
+         *                     the circular buffer; usually true as committing
+         *                     a circular_buffer's data to flash typically
+         *                     implies it is no longer needed.
+         */
+        void flush_circular_buffer(bool free_buffer);
+
     private:
         uint32_t log_base_addr;
         uint32_t log_curr_addr;
@@ -97,4 +147,7 @@ class Logger {
         uint8_t buffer[FLASH_PAGE_SIZE];
         uint32_t buffer_len;
         void (*print_func)(const uint8_t*);
+        uint8_t* circular_buffer;
+        size_t circular_buffer_len;
+        size_t circular_buffer_offset;
 };
