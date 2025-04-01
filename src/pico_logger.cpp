@@ -8,9 +8,8 @@ static void call_flash_range_program(void *param) {
 }
 
 static void call_flash_range_erase(void *param) {
-    for (uint32_t offset = (uint32_t)param; offset <= (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE); offset += FLASH_SECTOR_SIZE) {
-        flash_range_erase(offset, FLASH_SECTOR_SIZE);
-    }
+    uint32_t log_base_addr = *((uint32_t *) param);
+    flash_range_erase(log_base_addr, (PICO_FLASH_SIZE_BYTES - log_base_addr));
 }
 
 Logger::Logger(size_t packet_len, uint32_t log_base_addr, void (*print_func)(const uint8_t*)) {
@@ -25,11 +24,11 @@ Logger::Logger(size_t packet_len, uint32_t log_base_addr, void (*print_func)(con
 }
 
 void Logger::initialize(bool multicore) {
-    if (multicore) {
     #if !PICO_COPY_TO_RAM
+    if (multicore) {
         flash_safe_execute_core_init();
-    #endif
     }
+    #endif
 
     // XIP_BASE accesses the flash for reads using the builtin "DMA" of sorts
     const uint8_t* flash_contents = (const uint8_t *) (XIP_BASE + log_base_addr);
@@ -38,8 +37,7 @@ void Logger::initialize(bool multicore) {
     uint32_t offset = 0;
     uint32_t counter = 0;
     while (counter < FLASH_PAGE_SIZE && offset < PICO_FLASH_SIZE_BYTES) {
-        if (*(flash_contents + offset) == 0xFF ||
-            *(flash_contents + offset) == 0x00) {
+        if (*(flash_contents + offset) == 0xFF) {
             counter++;
         } else {
             counter = 0;
@@ -71,7 +69,7 @@ void Logger::read_memory() {
         printf("PICO_LOGGER: Reading memory back in byte format!\n");
         for (; offset < (log_curr_addr - log_base_addr); offset++) {
             printf("%02x", *(flash_contents + offset));
-            if (offset % 16 == 15)
+            if ((offset % packet_len) == (packet_len - 1))
                 printf("\n");
             else
                 printf(" ");
@@ -115,10 +113,11 @@ void Logger::flush_buffer() {
 }
 
 void Logger::erase_memory() {
+    printf("PICO_LOGGER: Erasing all memory from address 0x08%" PRIx32 " on!\n");
     #if PICO_COPY_TO_RAM
-        call_flash_range_erase((void*)log_base_addr);
+        call_flash_range_erase((void*)&log_base_addr);
     #else
-        int rc = flash_safe_execute(call_flash_range_erase, (void*)log_base_addr, UINT32_MAX);
+        int rc = flash_safe_execute(call_flash_range_erase, (void*)&log_base_addr, UINT32_MAX);
         hard_assert(rc == PICO_OK);
     #endif
     log_curr_addr = log_base_addr;
@@ -154,10 +153,11 @@ void Logger::read_circular_buffer() {
         printf("PICO_LOGGER: Reading memory back in byte format!\n");
         do {
             printf("%02x", *(circular_buffer + idx));
-            if (idx % 16 == 15)
+            if ((idx % packet_len) == (packet_len - 1)) {
                 printf("\n");
-            else
+            } else {
                 printf(" ");
+            }
             idx += packet_len;
             idx %= circular_buffer_len;
         } while ( idx != circular_buffer_offset );
