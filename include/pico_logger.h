@@ -12,6 +12,7 @@
 #include "pico/flash.h"
 #include "pico/assert.h"
 #include "hardware/flash.h"
+#include "hardware/sync.h"
 #include "boards/pico.h"
 
 // 256k from start of flash

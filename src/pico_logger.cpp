@@ -54,6 +54,10 @@ void Logger::initialize(bool multicore) {
         space_available = true;
         printf("PICO_LOGGER: Open space found at addr %" PRIx32 "\n", log_curr_addr);
     }
+
+    // Set buffer to all 0xFF to prevent writing unnecessary zeros when flushing
+    // an incomplete buffer
+    memset(buffer, 0xFF, FLASH_PAGE_SIZE);
 }
 
 void Logger::read_memory() {
@@ -78,6 +82,8 @@ void Logger::read_memory() {
 
     if (offset == 0) {
         printf("PICO_LOGGER: No log entries found!\n");
+    } else {
+        printf("PICO_LOGGER: Finished reading memory!\n");
     }
 }
 
@@ -99,6 +105,7 @@ void Logger::write_memory(const uint8_t* packet, bool flush) {
 }
 
 void Logger::flush_buffer() {
+    uint32_t ints = save_and_disable_interrupts();
 #if PICO_COPY_TO_RAM
     uintptr_t params[] = { log_curr_addr, buffer_len, (uintptr_t)buffer};
     call_flash_range_program(params);
@@ -108,12 +115,14 @@ void Logger::flush_buffer() {
     hard_assert(rc == PICO_OK);
 #endif
     log_curr_addr = log_curr_addr + buffer_len;
-    memset(buffer, 0, FLASH_PAGE_SIZE);
+    memset(buffer, 0xFF, FLASH_PAGE_SIZE);
     buffer_len = 0;
+    restore_interrupts(ints);
 }
 
 void Logger::erase_memory() {
-    printf("PICO_LOGGER: Erasing all memory from address 0x08%" PRIx32 " on!\n");
+    printf("PICO_LOGGER: Erasing all memory from address 0x%08" PRIx32 " on!\n", log_base_addr);
+    uint32_t ints = save_and_disable_interrupts();
     #if PICO_COPY_TO_RAM
         call_flash_range_erase((void*)&log_base_addr);
     #else
@@ -121,6 +130,8 @@ void Logger::erase_memory() {
         hard_assert(rc == PICO_OK);
     #endif
     log_curr_addr = log_base_addr;
+    restore_interrupts(ints);
+    printf("PICO_LOGGER: Memory erasure complete!\n");
 }
 
 
