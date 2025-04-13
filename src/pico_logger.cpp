@@ -52,7 +52,7 @@ void Logger::initialize(bool multicore) {
     } else {
         log_curr_addr = log_base_addr + (offset - FLASH_PAGE_SIZE);
         space_available = true;
-        printf("PICO_LOGGER: Open space found at addr %" PRIx32 "\n", log_curr_addr);
+        printf("PICO_LOGGER: Open space found at addr 0x%08" PRIx32 "\n", log_curr_addr);
     }
 
     // Set buffer to all 0xFF to prevent writing unnecessary zeros when flushing
@@ -88,17 +88,12 @@ void Logger::read_memory() {
 }
 
 void Logger::write_memory(const uint8_t* packet, bool flush) {
-    uint32_t packet_bytes_read = 0;
-
     if (packet != NULL) {
-        while(packet_bytes_read < packet_len) {
-            if (buffer_len == FLASH_PAGE_SIZE) {
-                flush_buffer();
-            }
-            buffer[buffer_len] = packet[packet_bytes_read];
-            buffer_len++;
-            packet_bytes_read++;
+        if (FLASH_PAGE_SIZE - buffer_len < packet_len) {
+            flush_buffer();
         }
+        memcpy((buffer + buffer_len), packet, packet_len);
+        buffer_len += packet_len;
 
         if (flush) { flush_buffer(); }
     }
@@ -137,8 +132,8 @@ void Logger::erase_memory() {
 
 void Logger::initialize_circular_buffer(size_t len) {
     if (circular_buffer == NULL) {
-        circular_buffer_len = len;
-        circular_buffer = (uint8_t*) malloc(circular_buffer_len);
+        circular_buffer_capacity = len;
+        circular_buffer = (uint8_t*) calloc(circular_buffer_capacity, 1);
     }
 }
 
@@ -148,17 +143,23 @@ void Logger::write_circular_buffer(const uint8_t* packet) {
             circular_buffer[idx + circular_buffer_offset] = packet[idx];
         }
         circular_buffer_offset += packet_len;
-        circular_buffer_offset %= circular_buffer_len;
+        circular_buffer_offset %= circular_buffer_capacity;
+        if (circular_buffer_len != circular_buffer_capacity) {
+            circular_buffer_len += packet_len;
+        }
     }
 }
 
 void Logger::read_circular_buffer() {
-    uint32_t idx = ((circular_buffer_offset + packet_len) % circular_buffer_len);
+    uint32_t idx = 0;
+    if (circular_buffer_len == circular_buffer_capacity) {
+        uint32_t idx = ((circular_buffer_offset + packet_len) % circular_buffer_capacity);
+    }
     if (print_func != nullptr) {
         do {
             print_func(circular_buffer + idx);
             idx += packet_len;
-            idx %= circular_buffer_len;
+            idx %= circular_buffer_capacity;
         } while (idx != circular_buffer_offset);
     } else {
         printf("PICO_LOGGER: Reading memory back in byte format!\n");
@@ -170,17 +171,20 @@ void Logger::read_circular_buffer() {
                 printf(" ");
             }
             idx += packet_len;
-            idx %= circular_buffer_len;
+            idx %= circular_buffer_capacity;
         } while ( idx != circular_buffer_offset );
     }
 }
 
 void Logger::flush_circular_buffer(bool free_buffer) {
-    uint32_t idx = ((circular_buffer_offset + packet_len) % circular_buffer_len);
+    uint32_t idx = 0;
+    if (circular_buffer_len == circular_buffer_capacity) {
+        idx = ((circular_buffer_offset + packet_len) % circular_buffer_capacity);
+    }
     do {
-        write_memory(circular_buffer + idx, false);
+        write_memory(circular_buffer + idx, true);
         idx += packet_len;
-        idx %= circular_buffer_len;
+        idx %= circular_buffer_capacity;
     } while (idx != circular_buffer_offset);
     flush_buffer();
     if (free_buffer) {

@@ -141,14 +141,18 @@ class Logger {
         void flush_circular_buffer(bool free_buffer);
 
     private:
-        uint32_t log_base_addr;
-        uint32_t log_curr_addr;
-        size_t packet_len;
-        bool space_available;
+        uint32_t log_base_addr = LOG_BASE_ADDR;
+        uint32_t log_curr_addr = LOG_BASE_ADDR;
+        size_t packet_len = 0;
+        bool space_available = false;
+
         uint8_t buffer[FLASH_PAGE_SIZE];
-        uint32_t buffer_len;
-        void (*print_func)(const uint8_t*);
-        uint8_t* circular_buffer;
-        size_t circular_buffer_len;
-        size_t circular_buffer_offset;
+        uint32_t buffer_len = 0;
+
+        void (*print_func)(const uint8_t*) = NULL;
+
+        uint8_t* circular_buffer = NULL;
+        size_t circular_buffer_capacity = 0;
+        size_t circular_buffer_offset = 0;
+        size_t circular_buffer_len = 0;
 };
