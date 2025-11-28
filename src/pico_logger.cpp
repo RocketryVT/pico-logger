@@ -1,4 +1,4 @@
-#include "pico_logger.h"
+#include "pico_logger.hpp"
 
 static void call_flash_range_program(void *param) {
     uint32_t offset = ((uintptr_t*)param)[0];
