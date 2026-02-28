@@ -13,7 +13,8 @@
 #include "pico/assert.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
-#include "boards/pico.h"
+// boards/pico.h removed — PICO_FLASH_SIZE_BYTES and PICO_COPY_TO_RAM are
+// provided by the CMake board configuration (PICO_BOARD) and the pico SDK.
 
 // 256k from start of flash
 #define LOG_BASE_ADDR (0x00040000)

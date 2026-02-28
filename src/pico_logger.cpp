@@ -139,8 +139,10 @@ void Logger::initialize_circular_buffer(size_t len) {
 
 void Logger::write_circular_buffer(const uint8_t* packet) {
     if (packet != NULL) {
+        // Use per-byte modulo so writes wrap correctly when offset + packet_len
+        // crosses the end of the buffer (fixes overflow at capacity boundary).
         for (uint32_t idx = 0; idx < packet_len; idx++) {
-            circular_buffer[idx + circular_buffer_offset] = packet[idx];
+            circular_buffer[(circular_buffer_offset + idx) % circular_buffer_capacity] = packet[idx];
         }
         circular_buffer_offset += packet_len;
         circular_buffer_offset %= circular_buffer_capacity;
@@ -153,7 +155,8 @@ void Logger::write_circular_buffer(const uint8_t* packet) {
 void Logger::read_circular_buffer() {
     uint32_t idx = 0;
     if (circular_buffer_len == circular_buffer_capacity) {
-        uint32_t idx = ((circular_buffer_offset + packet_len) % circular_buffer_capacity);
+        // Fix: assign to existing idx, not a new shadowed variable.
+        idx = ((circular_buffer_offset + packet_len) % circular_buffer_capacity);
     }
     if (print_func != nullptr) {
         do {
